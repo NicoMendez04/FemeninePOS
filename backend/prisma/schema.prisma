@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sales     Sale[]
+  logs      ActivityLog[]
+}
+
+model Brand {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+model Supplier {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  contact   String?
+  products  Product[]
+  purchases Purchase[]
+}
+
+model Product {
+  id            Int             @id @default(autoincrement())
+  name          String
+  description   String?
+  brandId       Int?
+  categoryId    Int?
+  supplierId    Int?
+  size          String?
+  color         String?
+  baseCode      String?
+  sku           String?         @unique
+  salePrice     Float?
+  costPrice     Float?
+  stockCached   Int?            @default(0)
+  stockMin      Int?            @default(2)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  isActive      Boolean         @default(true)
+  brand         Brand?          @relation(fields: [brandId], references: [id])
+  category      Category?       @relation(fields: [categoryId], references: [id])
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+  movements     StockMovement[]
+}
+
+model StockMovement {
+  id             Int           @id @default(autoincrement())
+  productId      Int
+  type           MovementType
+  quantity       Int
+  createdAt      DateTime      @default(now())
+  purchaseItemId Int?          @unique
+  saleItemId     Int?          @unique
+  product        Product       @relation(fields: [productId], references: [id])
+  purchaseItem   PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+  saleItem       SaleItem?     @relation(fields: [saleItemId], references: [id])
+}
+
+model Purchase {
+  id         Int            @id @default(autoincrement())
+  supplierId Int
+  createdAt  DateTime       @default(now())
+  supplier   Supplier       @relation(fields: [supplierId], references: [id])
+  items      PurchaseItem[]
+}
+
+model PurchaseItem {
+  id         Int            @id @default(autoincrement())
+  purchaseId Int
+  productId  Int
+  quantity   Int
+  price      Float
+  product    Product        @relation(fields: [productId], references: [id])
+  purchase   Purchase       @relation(fields: [purchaseId], references: [id])
+  movement   StockMovement?
+}
+
+model Sale {
+  id               Int             @id @default(autoincrement())
+  createdAt        DateTime        @default(now())
+  total            Float?
+  subtotal         Float?          // Total sin IVA
+  taxAmount        Float?          // Monto del IVA
+  taxRate          Float?          // Tasa de IVA aplicada (ej: 0.19 para 19%)
+  taxIncluded      Boolean         @default(false) // Si el precio incluye IVA o no
+  userId           Int?
+  
+  user             User?           @relation(fields: [userId], references: [id])
+  saleItems        SaleItem[]
+}
+
+model SaleItem {
+  id        Int            @id @default(autoincrement())
+  saleId    Int
+  productId Int
+  quantity  Int
+  price     Float
+  discount  Float?         @default(0)
+  product   Product        @relation(fields: [productId], references: [id])
+  sale      Sale           @relation(fields: [saleId], references: [id])
+  movement  StockMovement?
+}
+
+model ActivityLog {
+  id          Int          @id @default(autoincrement())
+  userId      Int?
+  action      LogAction
+  productId   Int?         // ID del producto afectado (para acciones relacionadas con productos)
+  productSku  String?      // SKU del producto para facilitar la búsqueda
+  details     String?      // Detalles adicionales de la acción
+  timestamp   DateTime     @default(now())
+  user        User?        @relation(fields: [userId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum MovementType {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum LogAction {
+  LOGIN
+  LOGOUT
+  CREATE_USER
+  UPDATE_USER
+  DELETE_USER
+  CREATE_PRODUCT
+  UPDATE_PRODUCT
+  DELETE_PRODUCT
+  VIEW_PRODUCT
+  PRINT_BARCODE
+  CREATE_SALE
+  UPDATE_SALE
+}

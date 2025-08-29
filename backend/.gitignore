@@ -1,0 +1,21 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+# Prisma generated files
+/src/generated/prisma
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Archive and backup files
+/archive
+/backup
+
+# Temporary files
+*.tmp
+*.temp
+*.log
