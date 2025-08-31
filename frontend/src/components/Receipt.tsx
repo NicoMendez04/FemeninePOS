@@ -154,14 +154,15 @@ const Receipt: React.FC<ReceiptProps> = ({ receiptData, isVisible, onClose }) =>
                 {(() => {
                   // Agrupar items por producto para mostrar correctamente en la boleta
                   const itemsGrouped = receiptData.items.reduce((groups: any, currentItem: any) => {
-                    const key = `${currentItem.product.id}-${currentItem.product.salePrice || currentItem.price}-${currentItem.discount}`;
+                    const key = `${currentItem.product.id}-${currentItem.product.salePrice || currentItem.price}-${currentItem.discount}-${currentItem.discountType}`;
                     if (!groups[key]) {
                       groups[key] = {
                         id: currentItem.product.id,
                         product: currentItem.product,
                         quantity: 0,
                         price: currentItem.product.salePrice || currentItem.price,
-                        discount: currentItem.discount
+                        discount: currentItem.discount,
+                        discountType: currentItem.discountType || 'amount'
                       };
                     }
                     groups[key].quantity += 1;
@@ -169,7 +170,17 @@ const Receipt: React.FC<ReceiptProps> = ({ receiptData, isVisible, onClose }) =>
                   }, {});
                   
                   return Object.values(itemsGrouped).map((item: any, index: number) => {
-                    const subtotal = (item.quantity * item.price) - (item.discount * item.quantity);
+                    const discountType = item.discountType || 'amount';
+                    let subtotal, discountAmount;
+                    
+                    if (discountType === 'percent') {
+                      discountAmount = item.quantity * item.price * (item.discount || 0) / 100;
+                      subtotal = item.quantity * item.price - discountAmount;
+                    } else {
+                      discountAmount = item.quantity * (item.discount || 0);
+                      subtotal = item.quantity * item.price - discountAmount;
+                    }
+
                     return (
                       <tr key={item.id} className="border-b border-gray-100">
                         <td className="py-2">
@@ -185,7 +196,11 @@ const Receipt: React.FC<ReceiptProps> = ({ receiptData, isVisible, onClose }) =>
                         <td className="text-center py-2">{item.quantity}</td>
                         <td className="text-right py-2">{formatCurrency(item.price)}</td>
                         <td className="text-right py-2">
-                          {item.discount > 0 ? `-${formatCurrency(item.discount * item.quantity)}` : '-'}
+                          {item.discount > 0 ? (
+                            discountType === 'percent' 
+                              ? `${item.discount}%`
+                              : formatCurrency(item.discount)
+                          ) : '-'}
                         </td>
                         <td className="text-right py-2 font-medium">{formatCurrency(subtotal)}</td>
                       </tr>

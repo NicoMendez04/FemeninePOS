@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import ProductDetailsModal from '../components/ProductDetailsModal';
-import { Plus, Search, Package, Tag, Truck, AlertTriangle, Trash2, Edit, RefreshCw, Eye, EyeOff, Archive, TrendingUp, TrendingDown, DollarSign, Box, Palette, Ruler, X } from 'lucide-react';
+import { Plus, Search, Package, Tag, Truck, AlertTriangle, Trash2, Edit, RefreshCw, Eye, EyeOff, Archive, TrendingUp, TrendingDown, DollarSign, Box, Palette, Ruler, X, Printer } from 'lucide-react';
 import { getProducts, getBrands, getCategories, getSuppliers, createProducts, deleteProduct, reactivateProduct, checkProductDeletability } from '../services/api';
 import { Product, ProductFormData, Brand, Category, Supplier } from '../types';
 import ProductForm from '../components/ProductForm';
+import LabelPreview from '../components/LabelPreview';
 import Notification from '../components/Notification';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,6 +37,10 @@ const InventoryPage: React.FC = () => {
 	const [showRestockModal, setShowRestockModal] = useState(false);
 	const [restockProduct, setRestockProduct] = useState<Product | null>(null);
 	const [restockQuantity, setRestockQuantity] = useState<number>(0);
+
+	// Estados para vista previa de etiqueta
+	const [showLabelPreview, setShowLabelPreview] = useState(false);
+	const [labelProduct, setLabelProduct] = useState<Product | null>(null);
 
 	// Función para mostrar notificación
 	const showNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
@@ -172,6 +177,51 @@ const InventoryPage: React.FC = () => {
 		}
 	};
 
+	// Función para mostrar vista previa de etiqueta
+	const handlePrintLabel = (product: Product) => {
+		setLabelProduct(product);
+		setShowLabelPreview(true);
+	};
+
+	// Función para proceder con la impresión
+	const handleConfirmPrint = async () => {
+		if (!labelProduct) return;
+
+		try {
+			const labelData = {
+				name: labelProduct.name,
+				sku: labelProduct.sku,
+				price: labelProduct.salePrice,
+				size: labelProduct.size,
+				color: labelProduct.color,
+				brand: labelProduct.brand?.name || '',
+				baseCode: labelProduct.baseCode
+			};
+
+			// Llamar API de impresión
+			const token = localStorage.getItem('token');
+			const response = await fetch(`http://localhost:4000/api/products/${labelProduct.id}/print-label`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${token}`
+				},
+				body: JSON.stringify(labelData)
+			});
+
+			if (response.ok) {
+				showNotification(`🖨️ Etiqueta enviada a impresión: ${labelProduct.name}`, 'success');
+				setShowLabelPreview(false);
+				setLabelProduct(null);
+			} else {
+				showNotification('❌ Error al enviar etiqueta a impresión', 'error');
+			}
+		} catch (error) {
+			console.error('Error imprimiendo etiqueta:', error);
+			showNotification('❌ Error al imprimir etiqueta', 'error');
+		}
+	};
+
 	const loadProductDeletability = async (products: Product[]) => {
 		try {
 			const activeProducts = products.filter(p => p.isActive);
@@ -268,6 +318,7 @@ const InventoryPage: React.FC = () => {
 		const matchesSearch = !searchTerm || 
 			product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
 			(product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
+			(product.baseCode && product.baseCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
 			(product.brand && product.brand.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
 			(product.category && product.category.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -380,7 +431,7 @@ const InventoryPage: React.FC = () => {
 							type="text"
 							value={searchTerm.replace(/[,']/g, '-')}
 							onChange={(e) => setSearchTerm(e.target.value.replace(/[,']/g, '-'))}
-							placeholder="Buscar por nombre, SKU, marca o categoría..."
+							placeholder="Buscar por nombre, SKU, código base, marca o categoría..."
 							className="pl-10 pr-4 py-3 w-full border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
 						/>
 					</div>
@@ -633,6 +684,15 @@ const InventoryPage: React.FC = () => {
 												>
 													<Eye className="h-4 w-4" />
 													<span className="hidden sm:inline">Detalles</span>
+												</button>
+
+												<button 
+													onClick={() => handlePrintLabel(product)}
+													className="flex items-center space-x-1 px-3 py-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 text-sm font-medium"
+													title="Imprimir etiqueta"
+												>
+													<Printer className="h-4 w-4" />
+													<span className="hidden sm:inline">Etiqueta</span>
 												</button>
 												
 												{showInactive ? (
@@ -908,6 +968,18 @@ const InventoryPage: React.FC = () => {
 			type={notification.type}
 			message={notification.message}
 			onClose={() => setNotification(null)}
+		/>
+	)}
+
+	{/* Modal de vista previa de etiqueta */}
+	{showLabelPreview && labelProduct && (
+		<LabelPreview
+			product={labelProduct}
+			onClose={() => {
+				setShowLabelPreview(false);
+				setLabelProduct(null);
+			}}
+			onPrint={handleConfirmPrint}
 		/>
 	)}
 

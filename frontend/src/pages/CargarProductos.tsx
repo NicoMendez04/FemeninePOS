@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProductForm from '../components/ProductForm';
 import ImportModal from '../components/ImportModal';
 import { getBrands, getSuppliers, getCategories } from '../services/api';
@@ -31,6 +31,7 @@ interface Product {
   supplierId?: number;
   categoryId?: number;
   stockMin?: number;
+  origin?: 'manual' | 'imported';
 }
 
 const CargarProductos: React.FC = () => {
@@ -39,9 +40,7 @@ const CargarProductos: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showImportModal, setShowImportModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [newImportedProducts, setNewImportedProducts] = useState<Product[]>([]);
-  const [importCounter, setImportCounter] = useState(0); // Para forzar re-render
-  const productFormRef = useRef<any>(null);
+  const [importedProducts, setImportedProducts] = useState<Product[]>([]);
 
   const refreshData = async () => {
     setBrands(await getBrands());
@@ -54,17 +53,9 @@ const CargarProductos: React.FC = () => {
   }, [refreshTrigger]);
 
   const handleImportComplete = (products: Product[]) => {
-    console.log('Import complete, products received:', products.length);
-    // Pasar directamente los productos nuevos sin acumular
-    setNewImportedProducts(products);
-    setImportCounter(prev => prev + 1); // Incrementar contador para forzar detección
-    setShowImportModal(false);
+    // Solo actualizar productos importados, NO cerrar el modal
+    setImportedProducts(products);
   };
-
-  const handleImportProcessed = useCallback(() => {
-    console.log('Clearing imported products');
-    setNewImportedProducts([]);
-  }, []);
 
   return (
     <div className="p-6 space-y-6">
@@ -97,15 +88,11 @@ const CargarProductos: React.FC = () => {
           brands={brands}
           suppliers={suppliers}
           categories={categories}
-          importedProducts={newImportedProducts}
-          importCounter={importCounter} // Pasar contador para forzar detección
-          onImportProcessed={handleImportProcessed} // Limpiar después de procesar
+          importedProducts={importedProducts}
           onSubmit={async (products) => {
-            // Asegurar que products sea siempre un array
-            const productsArray = Array.isArray(products) ? products : [products];
-            
             // Normalizar los datos antes de enviar
-            const normalized = productsArray.map(prod => ({
+            const productsArray = Array.isArray(products) ? products : [products];
+            const normalized = productsArray.map((prod: Product) => ({
               ...prod,
               brandId: prod.brandId ? parseInt(prod.brandId as any) : undefined,
               categoryId: prod.categoryId ? parseInt(prod.categoryId as any) : undefined,
@@ -125,13 +112,13 @@ const CargarProductos: React.FC = () => {
               });
               alert('Productos guardados correctamente');
               setRefreshTrigger(prev => prev + 1); // Refresh para actualizar datos
-              setNewImportedProducts([]); // Limpiar productos importados después de guardar
+              setImportedProducts([]); // Limpiar productos importados después de guardar
             } catch (err) {
               alert('Error al guardar productos');
             }
           }}
           onCancel={() => {
-            setNewImportedProducts([]); // Limpiar productos importados al cancelar
+            setImportedProducts([]); // Limpiar productos importados al cancelar
           }}
         />
       </div>

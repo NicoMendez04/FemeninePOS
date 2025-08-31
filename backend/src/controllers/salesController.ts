@@ -78,7 +78,13 @@ export const getSales = async (req: AuthenticatedRequest, res: Response) => {
     const salesWithTotals = sales.map(sale => ({
       ...sale,
       total: sale.total || sale.saleItems.reduce((sum, item) => {
-        const itemTotal = item.quantity * item.price - (item.discount || 0);
+        const discountType = item.discountType || 'amount';
+        let itemTotal;
+        if (discountType === 'percent') {
+          itemTotal = item.quantity * item.price * (1 - (item.discount || 0) / 100);
+        } else {
+          itemTotal = item.quantity * (item.price - (item.discount || 0));
+        }
         return sum + itemTotal;
       }, 0),
       itemsCount: sale.saleItems.reduce((sum, item) => sum + item.quantity, 0)
@@ -236,7 +242,16 @@ export const createSale = async (req: AuthenticatedRequest, res: Response) => {
 
         // Aplicar descuento si existe
         const discount = item.discount || 0;
-        const finalPrice = item.price * (1 - discount / 100);
+        const discountType = item.discountType || 'amount';
+        
+        let finalPrice;
+        if (discountType === 'percent') {
+          finalPrice = item.price * (1 - discount / 100);
+        } else {
+          // Monto fijo
+          finalPrice = item.price - discount;
+        }
+        
         const itemTotal = finalPrice * item.quantity;
         subtotalAmount += itemTotal;
 
@@ -244,7 +259,8 @@ export const createSale = async (req: AuthenticatedRequest, res: Response) => {
           productId: item.productId,
           quantity: item.quantity,
           price: item.price,
-          discount: discount
+          discount: discount,
+          discountType: discountType
         });
       }
 
@@ -273,7 +289,8 @@ export const createSale = async (req: AuthenticatedRequest, res: Response) => {
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
-              discount: item.discount || 0
+              discount: item.discount || 0,
+              discountType: item.discountType || 'amount'
             }
           });
 

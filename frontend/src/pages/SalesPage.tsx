@@ -20,12 +20,13 @@ const SalesPage: React.FC = () => {
     product: Product; 
     quantity: number; 
     discount: number;
+    discountType: 'amount' | 'percent'; // Nuevo campo
     discountMode: 'individual' | 'total';
   }>>([]);
   const [discountModalIdx, setDiscountModalIdx] = useState<number | null>(null);
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [discountMode, setDiscountMode] = useState<'individual' | 'total'>('total');
-  const [discountValue, setDiscountValue] = useState(0);
+  const [discountValue, setDiscountValue] = useState<number | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -58,6 +59,7 @@ const SalesPage: React.FC = () => {
       product,
       quantity: 1,
       discount: 0,
+      discountType: 'amount' as const, // Valor por defecto
       discountMode: 'total' as const
     };
     
@@ -80,7 +82,10 @@ const SalesPage: React.FC = () => {
 
   // Filtrado avanzado de productos
   const filteredProducts = products.filter(product => {
-    const matchesSearch = !search || product.name.toLowerCase().includes(search.toLowerCase()) || product.sku.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = !search || 
+      product.name.toLowerCase().includes(search.toLowerCase()) || 
+      product.sku.toLowerCase().includes(search.toLowerCase()) ||
+      (product.baseCode && product.baseCode.toLowerCase().includes(search.toLowerCase()));
     const matchesBrand = !brandFilter || product.brandId === brandFilter;
     const matchesCategory = !categoryFilter || product.categoryId === categoryFilter;
     const matchesColor = !colorFilter || product.color.toLowerCase() === colorFilter.toLowerCase();
@@ -91,7 +96,10 @@ const SalesPage: React.FC = () => {
   // Calcular el total del carrito con IVA
   const subtotal = cart.reduce((sum, item) => {
     const price = item.product.salePrice || 0;
-    return sum + (price - item.discount);
+    const discountAmount = item.discountType === 'amount' 
+      ? item.discount 
+      : price * (item.discount / 100);
+    return sum + (price - discountAmount);
   }, 0) - totalDiscount;
   
   const calculateTaxValues = (subtotal: number, taxIncluded: boolean, taxRate: number) => {
@@ -283,7 +291,8 @@ const SalesPage: React.FC = () => {
                 const modalFilteredProducts = products.filter(product => {
                   const matchesSearch = !modalSearch || 
                     product.name.toLowerCase().includes(modalSearch.toLowerCase()) || 
-                    product.sku.toLowerCase().includes(modalSearch.toLowerCase());
+                    product.sku.toLowerCase().includes(modalSearch.toLowerCase()) ||
+                    (product.baseCode && product.baseCode.toLowerCase().includes(modalSearch.toLowerCase()));
                   const matchesBrand = !modalBrandFilter || product.brandId === modalBrandFilter;
                   const matchesCategory = !modalCategoryFilter || product.categoryId === modalCategoryFilter;
                   const matchesColor = !modalColorFilter || product.color.toLowerCase().includes(modalColorFilter.toLowerCase());
@@ -462,15 +471,15 @@ const SalesPage: React.FC = () => {
                   type="number"
                   min={0}
                   max={discountType === 'percent' ? 100 : undefined}
-                  value={discountValue}
-                  onChange={e => setDiscountValue(Number(e.target.value))}
+                  value={discountValue || ''}
+                  onChange={e => setDiscountValue(e.target.value ? Number(e.target.value) : undefined)}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-lg font-semibold text-center focus:border-purple-500 focus:outline-none"
                   placeholder={discountType === 'amount' ? '0.00' : '0'}
                   autoFocus
                 />
                 
                 {/* Preview del descuento */}
-                {discountValue > 0 && cart[discountModalIdx] && (
+                {discountValue !== undefined && discountValue > 0 && cart[discountModalIdx] && (
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                     <div className="text-sm text-gray-600">
                       <div className="flex justify-between">
@@ -520,7 +529,7 @@ const SalesPage: React.FC = () => {
                   className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105"
                   onClick={() => {
                     const idx = discountModalIdx;
-                    if (idx === null) return;
+                    if (idx === null || discountValue === undefined || discountValue <= 0) return;
                     const newCart = [...cart];
                     const item = newCart[idx];
                     const unitPrice = item.product.salePrice || 0;
@@ -530,14 +539,18 @@ const SalesPage: React.FC = () => {
                     if (discountType === 'amount') {
                       finalDiscount = discountValue;
                     } else {
-                      finalDiscount = unitPrice * (discountValue / 100);
+                      finalDiscount = discountValue; // Guardar el porcentaje tal como está
                     }
                     
                     newCart[idx].discount = finalDiscount;
+                    newCart[idx].discountType = discountType; // Guardar el tipo
                     setCart(newCart);
                     setDiscountModalIdx(null);
                     
-                    showNotification(`Descuento aplicado: $${finalDiscount.toFixed(2)}`);
+                    const notificationText = discountType === 'amount' 
+                      ? `Descuento aplicado: $${finalDiscount.toFixed(2)}`
+                      : `Descuento aplicado: ${finalDiscount}%`;
+                    showNotification(notificationText);
                   }}
                 >
                   Aplicar
@@ -603,7 +616,10 @@ const SalesPage: React.FC = () => {
                         <div className="text-xl font-bold text-gray-800">
                           Total: ${items.reduce((sum, item) => {
                             const price = item.product.salePrice || 0;
-                            const itemTotal = price - item.discount;
+                            const discountAmount = item.discountType === 'amount' 
+                              ? item.discount 
+                              : price * (item.discount / 100);
+                            const itemTotal = price - discountAmount;
                             return sum + itemTotal;
                           }, 0).toFixed(2)}
                         </div>
@@ -651,12 +667,25 @@ const SalesPage: React.FC = () => {
                           <div className="text-center">
                             {item.discount > 0 ? (
                               <div className="flex flex-col items-center">
-                                <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
-                                  -${item.discount.toFixed(2)}
-                                </span>
-                                <span className="text-xs text-red-600 mt-1">
-                                  ({((item.discount / (item.product.salePrice || 1)) * 100).toFixed(1)}%)
-                                </span>
+                                {item.discountType === 'amount' ? (
+                                  <>
+                                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
+                                      -${item.discount.toFixed(2)}
+                                    </span>
+                                    <span className="text-xs text-red-600 mt-1">
+                                      ({((item.discount / (item.product.salePrice || 1)) * 100).toFixed(1)}%)
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-medium">
+                                      -{item.discount}%
+                                    </span>
+                                    <span className="text-xs text-red-600 mt-1">
+                                      (-${((item.product.salePrice || 0) * (item.discount / 100)).toFixed(2)})
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             ) : (
                               <span className="text-gray-400 text-sm">Sin descuento</span>
@@ -669,11 +698,22 @@ const SalesPage: React.FC = () => {
                               <span className={`font-bold text-lg ${
                                 item.discount > 0 ? 'text-green-600' : 'text-gray-800'
                               }`}>
-                                ${((item.product.salePrice || 0) - item.discount).toFixed(2)}
+                                ${(() => {
+                                  const price = item.product.salePrice || 0;
+                                  const discountAmount = item.discountType === 'amount' 
+                                    ? item.discount 
+                                    : price * (item.discount / 100);
+                                  return (price - discountAmount).toFixed(2);
+                                })()}
                               </span>
                               {item.discount > 0 && (
                                 <span className="text-xs text-green-600">
-                                  Ahorro: ${item.discount.toFixed(2)}
+                                  Ahorro: ${(() => {
+                                    const price = item.product.salePrice || 0;
+                                    return item.discountType === 'amount' 
+                                      ? item.discount.toFixed(2)
+                                      : (price * (item.discount / 100)).toFixed(2);
+                                  })()}
                                 </span>
                               )}
                             </div>
@@ -686,7 +726,7 @@ const SalesPage: React.FC = () => {
                                 setDiscountModalIdx(item.originalIndex);
                                 setDiscountType('amount');
                                 setDiscountMode('total');
-                                setDiscountValue(0);
+                                setDiscountValue(undefined);
                               }}
                               className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors w-full"
                             >
@@ -752,7 +792,15 @@ const SalesPage: React.FC = () => {
                 {cart.some(item => item.discount > 0) ? (
                   <>
                     <div className="text-2xl font-bold text-red-600">
-                      ${cart.reduce((sum, item) => sum + item.discount, 0).toFixed(2)}
+                      ${cart.reduce((sum, item) => {
+                        if (item.discount > 0) {
+                          const price = item.product.salePrice || 0;
+                          return sum + (item.discountType === 'amount' 
+                            ? item.discount 
+                            : price * (item.discount / 100));
+                        }
+                        return sum;
+                      }, 0).toFixed(2)}
                     </div>
                     <div className="text-sm text-gray-600">
                       {cart.filter(item => item.discount > 0).length} productos con descuento
@@ -893,12 +941,25 @@ const SalesPage: React.FC = () => {
                     <div className="text-center">
                       {item.discount > 0 ? (
                         <div className="flex flex-col items-center">
-                          <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">
-                            -${item.discount.toFixed(2)}
-                          </span>
-                          <span className="text-xs text-red-600 mt-1">
-                            ({((item.discount / (item.product.salePrice || 1)) * 100).toFixed(1)}%)
-                          </span>
+                          {item.discountType === 'amount' ? (
+                            <>
+                              <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">
+                                -${item.discount.toFixed(2)}
+                              </span>
+                              <span className="text-xs text-red-600 mt-1">
+                                ({((item.discount / (item.product.salePrice || 1)) * 100).toFixed(1)}%)
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">
+                                -{item.discount}%
+                              </span>
+                              <span className="text-xs text-red-600 mt-1">
+                                (-${((item.product.salePrice || 0) * (item.discount / 100)).toFixed(2)})
+                              </span>
+                            </>
+                          )}
                         </div>
                       ) : (
                         <span className="text-gray-400 text-xs">Sin descuento</span>
@@ -907,7 +968,13 @@ const SalesPage: React.FC = () => {
                     
                     <div className="text-center">
                       <div className={`font-bold ${item.discount > 0 ? 'text-green-600' : 'text-gray-800'}`}>
-                        ${((item.product.salePrice || 0) - item.discount).toFixed(2)}
+                        ${(() => {
+                          const price = item.product.salePrice || 0;
+                          const discountAmount = item.discountType === 'amount' 
+                            ? item.discount 
+                            : price * (item.discount / 100);
+                          return (price - discountAmount).toFixed(2);
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -926,7 +993,15 @@ const SalesPage: React.FC = () => {
               {cart.some(item => item.discount > 0) && (
                 <div className="flex justify-between text-red-600 mb-2">
                   <span>Descuentos:</span>
-                  <span>-${cart.reduce((sum, item) => sum + item.discount, 0).toFixed(2)}</span>
+                  <span>-${cart.reduce((sum, item) => {
+                    if (item.discount > 0) {
+                      const price = item.product.salePrice || 0;
+                      return sum + (item.discountType === 'amount' 
+                        ? item.discount 
+                        : price * (item.discount / 100));
+                    }
+                    return sum;
+                  }, 0).toFixed(2)}</span>
                 </div>
               )}
               
@@ -950,7 +1025,12 @@ const SalesPage: React.FC = () => {
                 try {
                   // Agrupar items por producto para enviar al backend
                   const groupedSales = cart.reduce((groups, item) => {
-                    const existingGroup = groups.find(g => g.productId === item.product.id && g.price === item.product.salePrice && g.discount === item.discount);
+                    const existingGroup = groups.find(g => 
+                      g.productId === item.product.id && 
+                      g.price === item.product.salePrice && 
+                      g.discount === item.discount &&
+                      g.discountType === item.discountType
+                    );
                     if (existingGroup) {
                       existingGroup.quantity += 1;
                     } else {
@@ -958,11 +1038,12 @@ const SalesPage: React.FC = () => {
                         productId: item.product.id,
                         quantity: 1,
                         price: item.product.salePrice || 0,
-                        discount: item.discount || 0
+                        discount: item.discount || 0,
+                        discountType: item.discountType || 'amount'
                       });
                     }
                     return groups;
-                  }, [] as Array<{productId: number, quantity: number, price: number, discount: number}>);
+                  }, [] as Array<{productId: number, quantity: number, price: number, discount: number, discountType: string}>);
                   
                   const result = await import('../services/api').then(api => api.registerSale(groupedSales, {
                     taxIncluded,

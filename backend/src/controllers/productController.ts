@@ -135,8 +135,8 @@ export const createProducts = async (req: Request, res: Response) => {
           description: description || '',
           brandId: parseInt(brandId),
           categoryId: parseInt(categoryId),
-          supplierId: parseInt(supplierId),
-          size: size || '',
+          supplierId: supplierId && !isNaN(parseInt(supplierId)) ? parseInt(supplierId) : null,
+          size: String(size || ''),
           color: color || '',
           baseCode: baseCode || '',
           sku: uniqueSKU, // Usar el SKU único generado

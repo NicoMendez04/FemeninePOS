@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Package, Tag, Barcode, DollarSign, Palette, Ruler, UserPlus, Plus, Copy } from 'lucide-react';
+import { X, Package, Tag, Barcode, DollarSign, Palette, Ruler, UserPlus, Plus, Copy, FileText } from 'lucide-react';
 import Notification from './Notification';
 
 interface Brand {
@@ -29,6 +29,7 @@ interface Product {
 	supplierId?: number;
 	categoryId?: number;
 	stockMin?: number;
+	origin?: 'manual' | 'imported';
 }
 
 interface ProductFormProps {
@@ -40,11 +41,9 @@ interface ProductFormProps {
 	onCancel?: () => void;
 	importedProducts?: Product[];
 	editingProduct?: Product | null;
-	onImportProcessed?: () => void; // Callback para limpiar productos importados
-	importCounter?: number; // Para forzar re-render cuando se importan productos
 }
 
-export default function ProductForm({ onSubmit, loading, brands, suppliers, categories, onCancel, importedProducts = [], editingProduct = null, onImportProcessed, importCounter }: ProductFormProps) {
+export default function ProductForm({ onSubmit, loading, brands, suppliers, categories, onCancel, importedProducts = [], editingProduct = null }: ProductFormProps) {
 	const [product, setProduct] = useState<Product>({
 		name: '',
 		size: '',
@@ -73,32 +72,9 @@ export default function ProductForm({ onSubmit, loading, brands, suppliers, cate
 
 	// Efecto para cargar productos importados
 	useEffect(() => {
-		console.log('UseEffect triggered:', { 
-			importedProductsLength: importedProducts?.length, 
-			importCounter,
-			currentProductsLength: products.length 
-		});
-		
 		if (importedProducts && importedProducts.length > 0) {
-			// Obtener SKUs de productos que ya están en la lista actual
-			const currentProductSKUs = products.map(p => p.sku);
-			console.log('Current SKUs:', currentProductSKUs);
-			console.log('Imported products SKUs:', importedProducts.map(p => p.sku));
-			
-			// Filtrar productos que no están en la lista actual
-			const newImportedProducts = importedProducts.filter(product => 
-				!currentProductSKUs.includes(product.sku)
-			);
-			
-			console.log('New products to process:', newImportedProducts.length);
-			
-			if (newImportedProducts.length === 0) {
-				console.log('No new products to process');
-				return; // No hay productos nuevos para procesar
-			}
-
 			// Resolver IDs de marca, categoría y proveedor basándose en nombres
-			const processedProducts = newImportedProducts.map((product: any) => {
+			const processedProducts = importedProducts.map((product: any) => {
 				let brandId = product.brandId;
 				let categoryId = product.categoryId;
 				let supplierId = product.supplierId;
@@ -137,28 +113,22 @@ export default function ProductForm({ onSubmit, loading, brands, suppliers, cate
 					...cleanProduct,
 					brandId,
 					categoryId,
-					supplierId
+					supplierId,
+					origin: 'imported' as const
 				};
 			});
 
-			if (processedProducts.length > 0) {
-				console.log('Adding products to list:', processedProducts.length);
-				setProducts(prevProducts => [...prevProducts, ...processedProducts]);
-				showNotification(`${processedProducts.length} productos cargados desde archivo`, 'success');
-				
-				// Notificar al padre que se procesaron los productos para que los limpie
-				// Usar timeout para asegurar que el estado se actualice correctamente
-				setTimeout(() => {
-					if (onImportProcessed) {
-						console.log('Calling onImportProcessed');
-						onImportProcessed();
-					}
-				}, 100);
-			}
-		} else {
-			console.log('No imported products or empty array');
+			// COMBINAR en lugar de reemplazar: mantener productos manuales y agregar importados
+			setProducts(prevProducts => {
+				// Filtrar productos manuales existentes
+				const manualProducts = prevProducts.filter(p => p.origin === 'manual');
+				// Combinar manuales + importados
+				const combinedProducts = [...manualProducts, ...processedProducts];
+				return combinedProducts;
+			});
+			showNotification(`${processedProducts.length} productos cargados desde archivo`, 'success');
 		}
-	}, [importedProducts, brands, categories, suppliers, importCounter]);
+	}, [importedProducts, brands, categories, suppliers]);
 
 	// Efecto para cargar datos del producto en modo edición
 	useEffect(() => {
@@ -302,7 +272,8 @@ export default function ProductForm({ onSubmit, loading, brands, suppliers, cate
 			stockMin: 2, // stock mínimo fijo
 			brandId: product.brandId ? Number(product.brandId) : undefined,
 			supplierId: product.supplierId ? Number(product.supplierId) : undefined,
-			categoryId: product.categoryId ? Number(product.categoryId) : undefined
+			categoryId: product.categoryId ? Number(product.categoryId) : undefined,
+			origin: 'manual' as const
 		};
 		
 		setProducts(prev => [...prev, prodWithCodes]);
@@ -762,12 +733,33 @@ export default function ProductForm({ onSubmit, loading, brands, suppliers, cate
 								<p className="text-xs text-gray-400">Los productos aparecerán aquí</p>
 							</div>
 						) : (
-							<div className="space-y-2 max-h-96 overflow-y-auto">
+							<div className="space-y-2 max-h-[85vh] overflow-y-auto">
 								{products.map((prod, index) => (
 									<div key={index} className="bg-gray-50 rounded-xl p-3 border border-gray-200 hover:border-purple-200 transition-all group">
 										<div className="flex justify-between items-start mb-2">
 											<div className="flex-1">
-												<h4 className="font-semibold text-sm text-gray-800 leading-tight">{prod.name}</h4>
+												<div className="flex items-center gap-2 mb-1">
+													<h4 className="font-semibold text-sm text-gray-800 leading-tight">{prod.name}</h4>
+													{prod.origin && (
+														<span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+															prod.origin === 'manual' 
+																? 'bg-blue-100 text-blue-700' 
+																: 'bg-green-100 text-green-700'
+														}`}>
+															{prod.origin === 'manual' ? (
+																<>
+																	<UserPlus size={10} />
+																	Manual
+																</>
+															) : (
+																<>
+																	<FileText size={10} />
+																	Importado
+																</>
+															)}
+														</span>
+													)}
+												</div>
 												<p className="text-xs text-gray-600">{prod.size} • {prod.color}</p>
 											</div>
 											<div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

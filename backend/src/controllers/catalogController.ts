@@ -46,13 +46,16 @@ export const createCategory = async (req: Request, res: Response) => {
 // Crear proveedor
 export const createSupplier = async (req: Request, res: Response) => {
   try {
-    const { name, contact } = req.body;
-    
-    const supplier = await prisma.supplier.create({ 
-      data: { 
-        name: name.trim(), 
-        contact: contact?.trim() || null
-      } 
+    const { name, contact, email, phone } = req.body;
+
+    const supplier = await prisma.supplier.create({
+      data: {
+        name: name.trim(),
+        contact: contact?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null
+      
+      }
     });
     
     res.status(201).json(supplier);
@@ -167,7 +170,7 @@ export const deleteCategory = async (req: Request, res: Response) => {
 export const updateSupplier = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, contact } = req.body;
+    const { name, contact, email, phone } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'El nombre del proveedor es requerido' });
     }
@@ -175,7 +178,9 @@ export const updateSupplier = async (req: Request, res: Response) => {
       where: { id: Number(id) },
       data: {
         name: name.trim(),
-        contact: contact?.trim() || null
+        contact: contact?.trim() || null,
+        email: email?.trim() || null,
+        phone: phone?.trim() || null
       }
     });
     res.json(supplier);

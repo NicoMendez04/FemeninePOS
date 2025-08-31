@@ -18,6 +18,7 @@ import UserManagementPage from './pages/UserManagementPage';
 import LogsPage from './pages/LogsPage';
 import BarcodeGeneratorPage from './pages/BarcodeGeneratorPage';
 import ExportsPage from './pages/ExportsPage';
+import ConfigurationPage from './pages/ConfigurationPage';
 // ...existing code...
 
 const App = () => (
@@ -82,10 +83,7 @@ const App = () => (
           } />
           <Route path="settings" element={
             <RoleProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-              <div className="p-6">
-                <h1 className="text-2xl font-bold">Configuración</h1>
-                <p className="text-gray-600">Módulo en desarrollo</p>
-              </div>
+              <ConfigurationPage />
             </RoleProtectedRoute>
           } />
         </Route>

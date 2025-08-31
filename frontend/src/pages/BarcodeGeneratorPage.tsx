@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import Barcode from 'react-barcode';
 import { Printer, Download, Copy, RefreshCw } from 'lucide-react';
+import BarcodePrintButton from '../components/BarcodePrintForm';
 
 const BarcodeGeneratorPage: React.FC = () => {
   const [text, setText] = useState('');
@@ -10,6 +11,8 @@ const BarcodeGeneratorPage: React.FC = () => {
   const [displayValue, setDisplayValue] = useState(true);
   const [fontSize, setFontSize] = useState(20);
   const [margin, setMargin] = useState(10);
+  const [printingBrother, setPrintingBrother] = useState(false);
+  const [brotherNotification, setBrotherNotification] = useState<string | null>(null);
   const barcodeRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
@@ -95,6 +98,33 @@ const BarcodeGeneratorPage: React.FC = () => {
   const generateRandomCode = () => {
     const randomCode = Math.random().toString().substr(2, 12);
     setText(randomCode);
+  };
+
+  const handleBrotherPrint = async () => {
+    if (!text) return;
+    setPrintingBrother(true);
+    setBrotherNotification(null);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:4000/api/print/barcode-custom', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text, barcode: text })
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setBrotherNotification('Etiqueta impresa correctamente en Brother QL-800');
+      } else {
+        setBrotherNotification(result.message || 'Error al imprimir en Brother');
+      }
+    } catch (error) {
+      setBrotherNotification('Error de red o servidor');
+    } finally {
+      setPrintingBrother(false);
+    }
   };
 
   const barcodeFormats = [
@@ -313,8 +343,18 @@ const BarcodeGeneratorPage: React.FC = () => {
               </p>
             </div>
           )}
+          {/* Botón para imprimir el código generado */}
+      {text && (
+        <BarcodePrintButton text={text} barcode={text} />
+      )}
         </div>
+        
       </div>
+
+
+    
+
+      
     </div>
   );
 };

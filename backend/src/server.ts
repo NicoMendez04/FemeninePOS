@@ -1,7 +1,8 @@
 import { PrismaClient } from './generated/prisma';
 const prisma = new PrismaClient();
 // Crear usuario admin si no existe 
-//TODO:ESTO MUERE DESPUES
+//TODO : ESTO MUERE DESPUES
+
 async function ensureAdminUser() {
   const adminEmail = 'nico@nico.com';
   const adminPassword = '$2b$10$5bEqbStSTL7lJw/rQiHkjef.oxzkYD/EFNV2h7474aubTTgyNyg1u';
@@ -20,6 +21,7 @@ async function ensureAdminUser() {
   }
 }
 ensureAdminUser();
+
 import express from 'express';
 import cors from 'cors';
 import productRoutes from './routes/productRoutes';
@@ -27,6 +29,8 @@ import catalogRoutes from './routes/catalogRoutes';
 import authRoutes from './routes/authRoutes';
 import salesRoutes from './routes/salesRoutes';
 import logRoutes from './routes/logRoutes';
+import printRoutes from './routes/printRoutes';
+import configRoutes from './routes/configRoutes';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -48,6 +52,12 @@ app.use('/api/sales', salesRoutes);
 
 // Rutas de logs (solo admin)
 app.use('/api/logs', logRoutes);
+
+// Rutas de impresión
+app.use('/api', printRoutes);
+
+// Rutas de configuración
+app.use('/api/config', configRoutes);
 
 app.get('/', (req, res) => {
   res.send('API FEMENINE funcionando');

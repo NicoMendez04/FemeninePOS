@@ -10,6 +10,7 @@ interface SaleItem {
   quantity: number;
   price: number;
   discount: number;
+  discountType?: string; // Nuevo campo
   product: {
     id: number;
     name: string;
@@ -405,11 +406,18 @@ const SalesHistoryPage: React.FC = () => {
                                   </div>
                                   {item.discount > 0 && (
                                     <div className="text-sm text-red-600">
-                                      Descuento: -{formatCurrency(item.discount)}
+                                      Descuento: {item.discountType === 'percent' ? `${item.discount}%` : `$${item.discount}`}
                                     </div>
                                   )}
                                   <div className="text-sm font-medium text-gray-900">
-                                    Subtotal: {formatCurrency((item.quantity * item.price) - (item.discount || 0))}
+                                    Subtotal: {formatCurrency((() => {
+                                      const discountType = item.discountType || 'amount';
+                                      if (discountType === 'percent') {
+                                        return item.quantity * item.price * (1 - (item.discount || 0) / 100);
+                                      } else {
+                                        return item.quantity * (item.price - (item.discount || 0));
+                                      }
+                                    })())}
                                   </div>
                                 </div>
                               </div>
